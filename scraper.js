@@ -5,14 +5,10 @@ async function extractModelData(page) {
   
   return await page.evaluate(() => {
     const selOptsList = document.querySelector('#selOptsList');
-    if (!selOptsList) return {
-      driverCost: 'N/A',
-      monthlyReference: 'N/A',
-      fringeBenefit: 'N/A'
-    };
-
-    const getData = (text) => {
-      const dls = selOptsList.querySelectorAll('dl');
+    
+    // Estrai i dati finanziari dal riepilogo
+    const getFinancialData = (text) => {
+      const dls = selOptsList?.querySelectorAll('dl') || [];
       for (const dl of dls) {
         const dt = dl.querySelector('dt');
         if (dt && dt.textContent.trim().includes(text)) {
@@ -23,12 +19,59 @@ async function extractModelData(page) {
       return 'N/A';
     };
 
+    // Estrai i dati tecnici dalla pagina
+    const getTechnicalData = (label) => {
+      const dls = document.querySelectorAll('.car_features dl');
+      for (const dl of dls) {
+        const dt = dl.querySelector('dt');
+        if (dt && dt.textContent.trim().includes(label)) {
+          const dd = dl.querySelector('dd');
+          return dd ? dd.textContent.trim() : 'N/A';
+        }
+      }
+      return 'N/A';
+    };
+
     return {
-      driverCost: getData('Importo mensile a carico del Driver'),
-      monthlyReference: getData('Costo di Riferimento Mensile'),
-      fringeBenefit: getData('Ammontare fringe benefit')
+      // Dati finanziari
+      driverCost: getFinancialData('Importo mensile a carico del Driver'),
+      monthlyReference: getFinancialData('Costo di Riferimento Mensile'),
+      fringeBenefit: getFinancialData('Ammontare fringe benefit'),
+      
+      // Dati tecnici
+      alimentazione: getTechnicalData('Alimentazione'),
+      potenza: getTechnicalData('Potenza'),
+      emissioniCO2: getTechnicalData('Emissioni di CO'),
+      cilindrata: getTechnicalData('Cilindrata'),
+      peso: getTechnicalData('Peso')
     };
   });
+}
+
+async function extractModelsFromPage(page, marca) {
+  await page.waitForTimeout(2000);
+
+  return await page.evaluate((marca) => {
+    const modelContainer = document.querySelector('.car-list, .vehicles-list');
+    if (!modelContainer) return [];
+
+    return Array.from(modelContainer.querySelectorAll('tr')).map(row => {
+      const linkEl = row.querySelector('a[href*="/' + marca.toLowerCase() + '/"]');
+      if (!linkEl) return null;
+
+      // Cerca i dati tecnici nella riga
+      const cells = Array.from(row.querySelectorAll('td'));
+      const getCell = (index) => cells[index]?.textContent.trim() || 'N/A';
+
+      return {
+        url: linkEl.href,
+        name: marca + ' ' + linkEl.textContent.trim(),
+        alimentazione: getCell(3),
+        potenza: getCell(4),
+        emissioniCO2: getCell(5)
+      };
+    }).filter(Boolean);
+  }, marca);
 }
 
 async function scrapeVolvoModels(page) {
@@ -38,18 +81,9 @@ async function scrapeVolvoModels(page) {
     timeout: 30000
   });
 
-  await page.waitForTimeout(2000);
-
-  const modelLinks = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a[href*="/volvo/"]'))
-      .map(a => ({
-        url: a.href,
-        name: 'Volvo ' + a.textContent.trim()
-      }));
-  });
-
-  console.log(`Trovati ${modelLinks.length} modelli Volvo`);
-  return modelLinks;
+  const models = await extractModelsFromPage(page, 'VOLVO');
+  console.log(`Trovati ${models.length} modelli Volvo`);
+  return models;
 }
 
 async function scrapeMercedesModels(page) {
@@ -59,23 +93,15 @@ async function scrapeMercedesModels(page) {
     timeout: 30000
   });
 
-  await page.waitForTimeout(2000);
-
-  const modelLinks = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a[href*="/mercedes/"]'))
-      .filter(a => {
-        const text = a.textContent.toLowerCase();
-        return text.includes('glc') && 
-               (text.includes('sports utility vehicle') || text.includes('coupè'));
-      })
-      .map(a => ({
-        url: a.href,
-        name: 'Mercedes ' + a.textContent.trim()
-      }));
+  const models = await extractModelsFromPage(page, 'MERCEDES');
+  const glcModels = models.filter(model => {
+    const text = model.name.toLowerCase();
+    return text.includes('glc') && 
+           (text.includes('sports utility vehicle') || text.includes('coupè'));
   });
 
-  console.log(`Trovati ${modelLinks.length} modelli Mercedes GLC`);
-  return modelLinks;
+  console.log(`Trovati ${glcModels.length} modelli Mercedes GLC`);
+  return glcModels;
 }
 
 async function scrapeTeslaModels(page) {
@@ -85,18 +111,9 @@ async function scrapeTeslaModels(page) {
     timeout: 30000
   });
 
-  await page.waitForTimeout(2000);
-
-  const modelLinks = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a[href*="/tesla/"]'))
-      .map(a => ({
-        url: a.href,
-        name: 'Tesla ' + a.textContent.trim()
-      }));
-  });
-
-  console.log(`Trovati ${modelLinks.length} modelli Tesla`);
-  return modelLinks;
+  const models = await extractModelsFromPage(page, 'TESLA');
+  console.log(`Trovati ${models.length} modelli Tesla`);
+  return models;
 }
 
 async function scrapeAllModels() {
@@ -120,7 +137,7 @@ async function scrapeAllModels() {
     console.log('In attesa del login e selezione km...');
     await new Promise(resolve => setTimeout(resolve, 30000));
 
-    // Raccogli tutti i modelli
+    // Raccogli tutti i modelli con i loro dati tecnici dalla lista
     const volvoLinks = await scrapeVolvoModels(page);
     const mercedesLinks = await scrapeMercedesModels(page);
     const teslaLinks = await scrapeTeslaModels(page);
@@ -138,14 +155,17 @@ async function scrapeAllModels() {
         timeout: 30000
       });
 
-      const modelData = await extractModelData(page);
+      const detailData = await extractModelData(page);
 
       results.push({
         model: model.name,
-        ...modelData
+        alimentazione: model.alimentazione,
+        potenza: model.potenza,
+        emissioniCO2: model.emissioniCO2,
+        ...detailData
       });
 
-      console.log('Dati estratti:', modelData);
+      console.log('Dati estratti:', detailData);
       await page.waitForTimeout(500);
     }
 
