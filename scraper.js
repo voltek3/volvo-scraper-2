@@ -53,18 +53,22 @@ async function scrapeVolvoModels() {
       
       // Estrai i dati dal modello
       const modelData = await page.evaluate(() => {
-        const getData = (text) => {
-          // Cerca nella box_riepilogo
-          const riepilogo = document.querySelector('.box_riepilogo');
-          if (!riepilogo) return 'N/A';
+        // Cerca nel div selOptsList
+        const selOptsList = document.querySelector('#selOptsList');
+        if (!selOptsList) return {
+          driverCost: 'N/A',
+          monthlyReference: 'N/A',
+          fringeBenefit: 'N/A'
+        };
 
-          // Cerca nella tabella all'interno del riepilogo
-          const rows = riepilogo.querySelectorAll('tr, dl');
-          for (const row of rows) {
-            if (row.textContent.includes(text)) {
-              // Prendi l'ultimo td o dd
-              const value = row.querySelector('td:last-child, dd:last-child');
-              return value ? value.textContent.trim() : 'N/A';
+        const getData = (text) => {
+          // Cerca nelle dl
+          const dls = selOptsList.querySelectorAll('dl');
+          for (const dl of dls) {
+            const dt = dl.querySelector('dt');
+            if (dt && dt.textContent.trim().includes(text)) {
+              const dd = dl.querySelector('dd');
+              return dd ? dd.textContent.trim() : 'N/A';
             }
           }
           return 'N/A';
