@@ -1,1 +1,12 @@
-ewogICJuYW1lIjogInZvbHZvLXNjcmFwZXIiLAogICJ2ZXJzaW9uIjogIjEuMC4wIiwKICAiZGVzY3JpcHRpb24iOiAiU2NyaXB0IHBlciBlc3RyYXJyZSBkYXRpIGRlaSBtb2RlbGxpIFZvbHZvIGRhbCBjb25maWd1cmF0b3JlIEFydmFsIiwKICAibWFpbiI6ICJpbmRleC5qcyIsCiAgInNjcmlwdHMiOiB7CiAgICAic3RhcnQiOiAibm9kZSBpbmRleC5qcyIKICB9LAogICJkZXBlbmRlbmNpZXMiOiB7CiAgICAicHVwcGV0ZWVyIjogIl4yMS41LjAiCiAgfQp9
+{
+  "name": "volvo-scraper",
+  "version": "1.0.0",
+  "description": "Script per estrarre dati dei modelli Volvo dal configuratore Arval",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.5.0"
+  }
+}
