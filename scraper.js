@@ -44,27 +44,33 @@ async function scrapeAllModels() {
     await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=MERCEDES', {
       waitUntil: 'networkidle0'
     });
-    await page.waitForTimeout(3000); // Aumentato il tempo di attesa per Mercedes
+    await page.waitForTimeout(3000);
 
     const mercedesLinks = await page.evaluate(() => {
       const links = [];
-      // Cerca in tutti i link della pagina
-      document.querySelectorAll('a').forEach(a => {
-        if (a.href.includes('/mercedes/') && a.textContent) {
-          const text = a.textContent.toLowerCase();
-          if (text.includes('glc') && 
-             (text.includes('sports utility') || text.includes('coupé') || text.includes('coupe'))) {
-            links.push({
-              url: a.href,
-              name: 'Mercedes ' + a.textContent.trim()
-            });
-          }
+      // Cerca nelle tabelle dei modelli
+      document.querySelectorAll('.table-modelli').forEach(table => {
+        // Verifica se la tabella è per GLC
+        if (table.id && table.id.toLowerCase().includes('glc')) {
+          // Cerca i link nella prima colonna di ogni riga
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            const firstCell = tr.querySelector('td');
+            if (firstCell) {
+              const link = firstCell.querySelector('a');
+              if (link && link.href && link.href.includes('/mercedes/')) {
+                links.push({
+                  url: link.href,
+                  name: 'Mercedes ' + link.textContent.trim()
+                });
+              }
+            }
+          });
         }
       });
       return links;
     });
     console.log(`Trovati ${mercedesLinks.length} modelli Mercedes GLC`);
-
+    
     // Tesla
     console.log('\nAnalizzando modelli Tesla...');
     await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=TESLA', {
