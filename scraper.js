@@ -18,22 +18,25 @@ async function scrapeVolvoModels() {
       timeout: 30000
     });
 
-    console.log('In attesa del login...');
-    await page.waitForSelector('.car-list', { timeout: 120000 }); // 2 minuti di timeout
+    console.log('In attesa del login e selezione km...');
+    // Aspetta che l'utente faccia login e selezioni i km
+    await new Promise(resolve => setTimeout(resolve, 60000)); // Aspetta 60 secondi
 
-    console.log('Login completato! Navigando alla pagina Volvo...');
+    console.log('Navigando alla pagina Volvo...');
     await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=VOLVO', {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
 
-    // Attendi che i link dei modelli siano caricati
-    console.log('Cercando i modelli disponibili...');
-    await page.waitForSelector('.car-list');
+    // Attendi che la pagina sia caricata
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Aspetta 5 secondi
+
+    // Fai uno screenshot per debug
+    await page.screenshot({ path: 'volvo-page.png', fullPage: true });
 
     // Estrai tutti i link dei modelli
     const modelLinks = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.car-list a[href*="/volvo/"]'))
+      return Array.from(document.querySelectorAll('a[href*="/volvo/"]'))
         .map(a => ({
           url: a.href,
           name: a.textContent.trim()
@@ -52,16 +55,22 @@ async function scrapeVolvoModels() {
       });
 
       // Aspetta che il riepilogo sia caricato
-      await page.waitForSelector('#Riepilogo', { timeout: 30000 });
+      await page.waitForTimeout(5000); // Aspetta 5 secondi
+      
+      // Fai uno screenshot della pagina del modello per debug
+      await page.screenshot({ path: `model-${model.name.replace(/[^a-z0-9]/gi, '_')}.png`, fullPage: true });
       
       // Estrai i dati dal modello
       const modelData = await page.evaluate(() => {
         const getData = (label) => {
-          // Cerca il testo nel riepilogo
-          const row = Array.from(document.querySelectorAll('#Riepilogo tr')).find(row => 
-            row.textContent.includes(label)
-          );
-          return row ? row.querySelector('td:last-child').textContent.trim() : 'N/A';
+          const rows = document.querySelectorAll('tr');
+          for (const row of rows) {
+            if (row.textContent.includes(label)) {
+              const lastCell = row.querySelector('td:last-child');
+              return lastCell ? lastCell.textContent.trim() : 'N/A';
+            }
+          }
+          return 'N/A';
         };
 
         return {
