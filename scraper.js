@@ -1,121 +1,5 @@
 const puppeteer = require('puppeteer');
 
-async function extractModelData(page) {
-  await page.waitForTimeout(1000);
-  
-  return await page.evaluate(() => {
-    const selOptsList = document.querySelector('#selOptsList');
-    
-    // Estrai i dati finanziari dal riepilogo
-    const getFinancialData = (text) => {
-      const dls = selOptsList?.querySelectorAll('dl') || [];
-      for (const dl of dls) {
-        const dt = dl.querySelector('dt');
-        if (dt && dt.textContent.trim().includes(text)) {
-          const dd = dl.querySelector('dd');
-          return dd ? dd.textContent.trim() : 'N/A';
-        }
-      }
-      return 'N/A';
-    };
-
-    // Estrai i dati tecnici dalla pagina
-    const getTechnicalData = (label) => {
-      const dls = document.querySelectorAll('.car_features dl');
-      for (const dl of dls) {
-        const dt = dl.querySelector('dt');
-        if (dt && dt.textContent.trim().includes(label)) {
-          const dd = dl.querySelector('dd');
-          return dd ? dd.textContent.trim() : 'N/A';
-        }
-      }
-      return 'N/A';
-    };
-
-    return {
-      // Dati finanziari
-      driverCost: getFinancialData('Importo mensile a carico del Driver'),
-      monthlyReference: getFinancialData('Costo di Riferimento Mensile'),
-      fringeBenefit: getFinancialData('Ammontare fringe benefit'),
-      
-      // Dati tecnici
-      alimentazione: getTechnicalData('Alimentazione'),
-      potenza: getTechnicalData('Potenza'),
-      emissioniCO2: getTechnicalData('Emissioni di CO'),
-      cilindrata: getTechnicalData('Cilindrata'),
-      peso: getTechnicalData('Peso')
-    };
-  });
-}
-
-async function extractModelsFromPage(page, marca) {
-  await page.waitForTimeout(2000);
-
-  return await page.evaluate((marca) => {
-    const modelContainer = document.querySelector('.car-list, .vehicles-list');
-    if (!modelContainer) return [];
-
-    return Array.from(modelContainer.querySelectorAll('tr')).map(row => {
-      const linkEl = row.querySelector('a[href*="/' + marca.toLowerCase() + '/"]');
-      if (!linkEl) return null;
-
-      // Cerca i dati tecnici nella riga
-      const cells = Array.from(row.querySelectorAll('td'));
-      const getCell = (index) => cells[index]?.textContent.trim() || 'N/A';
-
-      return {
-        url: linkEl.href,
-        name: marca + ' ' + linkEl.textContent.trim(),
-        alimentazione: getCell(3),
-        potenza: getCell(4),
-        emissioniCO2: getCell(5)
-      };
-    }).filter(Boolean);
-  }, marca);
-}
-
-async function scrapeVolvoModels(page) {
-  console.log('\nAnalizzando modelli Volvo...');
-  await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=VOLVO', {
-    waitUntil: 'networkidle0',
-    timeout: 30000
-  });
-
-  const models = await extractModelsFromPage(page, 'VOLVO');
-  console.log(`Trovati ${models.length} modelli Volvo`);
-  return models;
-}
-
-async function scrapeMercedesModels(page) {
-  console.log('\nAnalizzando modelli Mercedes...');
-  await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=MERCEDES', {
-    waitUntil: 'networkidle0',
-    timeout: 30000
-  });
-
-  const models = await extractModelsFromPage(page, 'MERCEDES');
-  const glcModels = models.filter(model => {
-    const text = model.name.toLowerCase();
-    return text.includes('glc') && 
-           (text.includes('sports utility vehicle') || text.includes('coupè'));
-  });
-
-  console.log(`Trovati ${glcModels.length} modelli Mercedes GLC`);
-  return glcModels;
-}
-
-async function scrapeTeslaModels(page) {
-  console.log('\nAnalizzando modelli Tesla...');
-  await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=TESLA', {
-    waitUntil: 'networkidle0',
-    timeout: 30000
-  });
-
-  const models = await extractModelsFromPage(page, 'TESLA');
-  console.log(`Trovati ${models.length} modelli Tesla`);
-  return models;
-}
-
 async function scrapeAllModels() {
   const browser = await puppeteer.launch({
     headless: false,
@@ -137,36 +21,116 @@ async function scrapeAllModels() {
     console.log('In attesa del login e selezione km...');
     await new Promise(resolve => setTimeout(resolve, 30000));
 
-    // Raccogli tutti i modelli con i loro dati tecnici dalla lista
-    const volvoLinks = await scrapeVolvoModels(page);
-    const mercedesLinks = await scrapeMercedesModels(page);
-    const teslaLinks = await scrapeTeslaModels(page);
+    const results = [];
+
+    // Volvo
+    console.log('\nAnalizzando modelli Volvo...');
+    await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=VOLVO', {
+      waitUntil: 'networkidle0'
+    });
+    await page.waitForTimeout(2000);
+
+    const volvoLinks = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('a[href*="/volvo/"]'))
+        .map(a => ({
+          url: a.href,
+          name: 'Volvo ' + a.textContent.trim()
+        }));
+    });
+
+    // Mercedes
+    console.log('\nAnalizzando modelli Mercedes...');
+    await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=MERCEDES', {
+      waitUntil: 'networkidle0'
+    });
+    await page.waitForTimeout(2000);
+
+    const mercedesLinks = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('a[href*="/mercedes/"]'))
+        .filter(a => {
+          const text = a.textContent.toLowerCase();
+          return text.includes('glc') && 
+                 (text.includes('sports utility vehicle') || text.includes('coupè'));
+        })
+        .map(a => ({
+          url: a.href,
+          name: 'Mercedes ' + a.textContent.trim()
+        }));
+    });
+
+    // Tesla
+    console.log('\nAnalizzando modelli Tesla...');
+    await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=TESLA', {
+      waitUntil: 'networkidle0'
+    });
+    await page.waitForTimeout(2000);
+
+    const teslaLinks = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('a[href*="/tesla/"]'))
+        .map(a => ({
+          url: a.href,
+          name: 'Tesla ' + a.textContent.trim()
+        }));
+    });
 
     const allModels = [...volvoLinks, ...mercedesLinks, ...teslaLinks];
     console.log(`\nTrovati in totale ${allModels.length} modelli da analizzare`);
-
-    const results = [];
 
     // Analizza ogni modello
     for (const model of allModels) {
       console.log(`\nAnalizzando ${model.name}...`);
       await page.goto(model.url, {
-        waitUntil: 'networkidle0',
-        timeout: 30000
+        waitUntil: 'networkidle0'
       });
+      await page.waitForTimeout(2000);
 
-      const detailData = await extractModelData(page);
+      const modelData = await page.evaluate(() => {
+        // Dati finanziari dal riepilogo
+        const selOptsList = document.querySelector('#selOptsList');
+        const getData = (text) => {
+          if (!selOptsList) return 'N/A';
+          const dls = selOptsList.querySelectorAll('dl');
+          for (const dl of dls) {
+            const dt = dl.querySelector('dt');
+            if (dt && dt.textContent.trim().includes(text)) {
+              const dd = dl.querySelector('dd');
+              return dd ? dd.textContent.trim() : 'N/A';
+            }
+          }
+          return 'N/A';
+        };
+
+        // Dati tecnici dalla pagina
+        const getTechnicalData = (text) => {
+          const dls = document.querySelectorAll('.car_features dl');
+          for (const dl of dls) {
+            const dt = dl.querySelector('dt');
+            if (dt && dt.textContent.trim().includes(text)) {
+              const dd = dl.querySelector('dd');
+              return dd ? dd.textContent.trim() : 'N/A';
+            }
+          }
+          return 'N/A';
+        };
+
+        return {
+          driverCost: getData('Importo mensile a carico del Driver'),
+          monthlyReference: getData('Costo di Riferimento Mensile'),
+          fringeBenefit: getData('Ammontare fringe benefit'),
+          alimentazione: getTechnicalData('Alimentazione'),
+          potenza: getTechnicalData('Potenza'),
+          co2: getTechnicalData('Emissioni di CO'),
+          cilindrata: getTechnicalData('Cilindrata')
+        };
+      });
 
       results.push({
         model: model.name,
-        alimentazione: model.alimentazione,
-        potenza: model.potenza,
-        emissioniCO2: model.emissioniCO2,
-        ...detailData
+        ...modelData
       });
 
-      console.log('Dati estratti:', detailData);
-      await page.waitForTimeout(500);
+      console.log('Dati estratti:', modelData);
+      await page.waitForTimeout(1000);
     }
 
     // Ordina i risultati per costo driver
