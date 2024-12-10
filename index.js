@@ -1,8 +1,8 @@
-const { scrapeVolvoModels } = require('./scraper.js');
+const { scrapeAllModels } = require('./scraper.js');
 
 console.log('Avvio dello script di scraping...');
 
-scrapeVolvoModels()
+scrapeAllModels()
   .then(results => {
     console.log('\nScript completato con successo!');
   })
