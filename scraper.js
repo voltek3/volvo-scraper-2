@@ -19,7 +19,7 @@ async function scrapeVolvoModels() {
     });
 
     console.log('In attesa del login e selezione km...');
-    await new Promise(resolve => setTimeout(resolve, 60000)); // Aspetta 60 secondi
+    await new Promise(resolve => setTimeout(resolve, 30000)); // Ridotto a 30 secondi
 
     console.log('Navigando alla pagina Volvo...');
     await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=VOLVO', {
@@ -27,7 +27,7 @@ async function scrapeVolvoModels() {
       timeout: 30000
     });
 
-    await page.waitForTimeout(5000); // Aspetta che la pagina sia completamente caricata
+    await page.waitForTimeout(2000); // Ridotto a 2 secondi
 
     // Estrai tutti i link dei modelli
     const modelLinks = await page.evaluate(() => {
@@ -49,7 +49,7 @@ async function scrapeVolvoModels() {
         timeout: 30000
       });
 
-      await page.waitForTimeout(5000); // Aspetta che il riepilogo sia caricato
+      await page.waitForTimeout(1000); // Ridotto a 1 secondo
       
       // Estrai i dati dal modello
       const modelData = await page.evaluate(() => {
@@ -87,7 +87,7 @@ async function scrapeVolvoModels() {
       });
 
       console.log('Dati estratti:', modelData);
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500); // Ridotto a mezzo secondo
     }
 
     const sortedResults = results.sort((a, b) => {
