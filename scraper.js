@@ -37,26 +37,33 @@ async function scrapeAllModels() {
           name: 'Volvo ' + a.textContent.trim()
         }));
     });
+    console.log(`Trovati ${volvoLinks.length} modelli Volvo`);
 
     // Mercedes
     console.log('\nAnalizzando modelli Mercedes...');
     await page.goto('https://www.arval-carconfigurator.com/index.jsp?makerId=MERCEDES', {
       waitUntil: 'networkidle0'
     });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000); // Aumentato il tempo di attesa per Mercedes
 
     const mercedesLinks = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('a[href*="/mercedes/"]'))
-        .filter(a => {
+      const links = [];
+      // Cerca in tutti i link della pagina
+      document.querySelectorAll('a').forEach(a => {
+        if (a.href.includes('/mercedes/') && a.textContent) {
           const text = a.textContent.toLowerCase();
-          return text.includes('glc') && 
-                 (text.includes('sports utility vehicle') || text.includes('coupè'));
-        })
-        .map(a => ({
-          url: a.href,
-          name: 'Mercedes ' + a.textContent.trim()
-        }));
+          if (text.includes('glc') && 
+             (text.includes('sports utility') || text.includes('coupé') || text.includes('coupe'))) {
+            links.push({
+              url: a.href,
+              name: 'Mercedes ' + a.textContent.trim()
+            });
+          }
+        }
+      });
+      return links;
     });
+    console.log(`Trovati ${mercedesLinks.length} modelli Mercedes GLC`);
 
     // Tesla
     console.log('\nAnalizzando modelli Tesla...');
@@ -72,6 +79,7 @@ async function scrapeAllModels() {
           name: 'Tesla ' + a.textContent.trim()
         }));
     });
+    console.log(`Trovati ${teslaLinks.length} modelli Tesla`);
 
     const allModels = [...volvoLinks, ...mercedesLinks, ...teslaLinks];
     console.log(`\nTrovati in totale ${allModels.length} modelli da analizzare`);
