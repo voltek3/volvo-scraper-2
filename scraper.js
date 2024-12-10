@@ -19,7 +19,6 @@ async function scrapeVolvoModels() {
     });
 
     console.log('In attesa del login e selezione km...');
-    // Aspetta che l'utente faccia login e selezioni i km
     await new Promise(resolve => setTimeout(resolve, 60000)); // Aspetta 60 secondi
 
     console.log('Navigando alla pagina Volvo...');
@@ -28,11 +27,7 @@ async function scrapeVolvoModels() {
       timeout: 30000
     });
 
-    // Attendi che la pagina sia caricata
-    await new Promise(resolve => setTimeout(resolve, 5000)); // Aspetta 5 secondi
-
-    // Fai uno screenshot per debug
-    await page.screenshot({ path: 'volvo-page.png', fullPage: true });
+    await page.waitForTimeout(5000); // Aspetta che la pagina sia completamente caricata
 
     // Estrai tutti i link dei modelli
     const modelLinks = await page.evaluate(() => {
@@ -54,20 +49,22 @@ async function scrapeVolvoModels() {
         timeout: 30000
       });
 
-      // Aspetta che il riepilogo sia caricato
-      await page.waitForTimeout(5000); // Aspetta 5 secondi
-      
-      // Fai uno screenshot della pagina del modello per debug
-      await page.screenshot({ path: `model-${model.name.replace(/[^a-z0-9]/gi, '_')}.png`, fullPage: true });
+      await page.waitForTimeout(5000); // Aspetta che il riepilogo sia caricato
       
       // Estrai i dati dal modello
       const modelData = await page.evaluate(() => {
-        const getData = (label) => {
-          const rows = document.querySelectorAll('tr');
+        const getData = (text) => {
+          // Cerca nella box_riepilogo
+          const riepilogo = document.querySelector('.box_riepilogo');
+          if (!riepilogo) return 'N/A';
+
+          // Cerca nella tabella all'interno del riepilogo
+          const rows = riepilogo.querySelectorAll('tr, dl');
           for (const row of rows) {
-            if (row.textContent.includes(label)) {
-              const lastCell = row.querySelector('td:last-child');
-              return lastCell ? lastCell.textContent.trim() : 'N/A';
+            if (row.textContent.includes(text)) {
+              // Prendi l'ultimo td o dd
+              const value = row.querySelector('td:last-child, dd:last-child');
+              return value ? value.textContent.trim() : 'N/A';
             }
           }
           return 'N/A';
