@@ -1,4 +1,31 @@
 const puppeteer = require('puppeteer');
+const fs = require('fs');
+
+function saveToCSV(results) {
+  // Prepara l'header del CSV
+  const headers = ['model', 'driverCost', 'monthlyReference', 'fringeBenefit', 'alimentazione', 'potenza', 'co2', 'cilindrata'];
+  
+  // Converte i risultati in formato CSV
+  const csv = [
+    // Header
+    headers.join(','),
+    // Dati
+    ...results.map(row => {
+      return headers.map(header => {
+        // Gestisce valori con virgole aggiungendo le virgolette
+        const value = row[header]?.toString().replace(/"/g, '""') || '';
+        return value.includes(',') ? `"${value}"` : value;
+      }).join(',');
+    })
+  ].join('\n');
+
+  // Salva il file
+  const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+  const filename = `risultati_${timestamp}.csv`;
+  fs.writeFileSync(filename, csv);
+  console.log(`\nRisultati salvati in: ${filename}`);
+  return filename;
+}
 
 async function scrapeAllModels() {
   const browser = await puppeteer.launch({
@@ -48,11 +75,8 @@ async function scrapeAllModels() {
 
     const mercedesLinks = await page.evaluate(() => {
       const links = [];
-      // Cerca nelle tabelle dei modelli
       document.querySelectorAll('.table-modelli').forEach(table => {
-        // Verifica se la tabella è per GLC
         if (table.id && table.id.toLowerCase().includes('glc')) {
-          // Cerca i link nella prima colonna di ogni riga
           table.querySelectorAll('tbody tr').forEach(tr => {
             const firstCell = tr.querySelector('td');
             if (firstCell) {
@@ -156,6 +180,10 @@ async function scrapeAllModels() {
 
     console.log('\nAnalisi completata! Ecco i risultati ordinati per costo driver:');
     console.table(sortedResults);
+
+    // Salva i risultati in un file CSV
+    const filename = saveToCSV(sortedResults);
+    console.log(`\nPuoi aprire ${filename} con Excel o Google Sheets`);
 
     return sortedResults;
 
